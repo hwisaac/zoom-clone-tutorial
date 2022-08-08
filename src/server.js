@@ -23,4 +23,20 @@ const server = http.createServer(app);
 //ws로 만드는 웹소켓서버. {server}전달을 통해 http, websocket 둘다 같은서버에서 작동함
 const wss = new WebSocket.Server({ server });
 
+//여기서의 socket은 연결된 브라우저를 말한다.
+const handleConnection = (socket) =>{
+    // 메세지 obj를 front에 보낸다 message.data 에 저장됨
+    socket.send("hello");
+}
+
+
+wss.on("connection", (socket) => {
+    console.log("connected to browser");
+
+    //front 에서 보낸 메세지 출력하기
+    socket.on("message", message => {
+        console.log(message);
+    })
+});
+
 server.listen(3000, handleListen);
