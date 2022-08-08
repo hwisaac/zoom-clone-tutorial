@@ -23,20 +23,42 @@ const server = http.createServer(app);
 //ws로 만드는 웹소켓서버. {server}전달을 통해 http, websocket 둘다 같은서버에서 작동함
 const wss = new WebSocket.Server({ server });
 
+
+//여기부터 백엔드 코드
+
 //여기서의 socket은 연결된 브라우저를 말한다.
 const handleConnection = (socket) =>{
     // 메세지 obj를 front에 보낸다 message.data 에 저장됨
     socket.send("hello");
 }
 
+//fake DB. 서버가 연결되면 그 커넥션을 담는다. 서로 다른 브라우저에 동일 메세지 보내기위함
+const sockets = [];
 
+//서버가 연결시
 wss.on("connection", (socket) => {
-    console.log("connected to browser");
+    sockets.push(socket);
+    socket["nickname"] = "Anonymous";
 
-    //front 에서 보낸 메세지 출력하기
-    socket.on("message", message => {
-        console.log(message);
-    })
+    console.log("connected to browser");
+    
+    //front에서 메세지 받을 때
+    socket.on("message", (msg) => {
+        //text를 json obj로 바꾼다
+        const message = JSON.parse(msg);
+        switch(message.type){
+            case "new_message":
+                sockets.forEach((aSocket) => 
+                    aSocket.send(`${socket.nickname}: ${message.payload}`)
+                    );
+                break;
+            case "nickname":
+                //socket obj 에 "nickname" : payload 추가
+                socket["nickname"] = message.payload;
+                break;
+        }
+
+    });
 });
 
 server.listen(3000, handleListen);
