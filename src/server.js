@@ -1,5 +1,6 @@
 import express from "express";
-import WebSocket from "ws";
+// import WebSocket from "ws";
+import SocketIO from "socket.io";
 import http from "http";
 
 const app =express();
@@ -16,49 +17,50 @@ app.get("/*", (req,res) =>res.redirect("/"));
 
 //express로 만드는 http서버
 const handleListen= ()=>console.log(`Listening on http://localhost:3000/`);
-// app.listen(3000, handleListen);
 
 //http 서버를 하나만들자 express()를 리스너로하자
 const server = http.createServer(app);
-//ws로 만드는 웹소켓서버. {server}전달을 통해 http, websocket 둘다 같은서버에서 작동함
-const wss = new WebSocket.Server({ server });
+// //ws로 만드는 웹소켓서버. {server}전달을 통해 http, websocket 둘다 같은서버에서 작동함
+// const wss = new WebSocket.Server({ server });
+
+// socketIO로 서버를 만들자.
+const wsServer = SocketIO(server);
 
 
 //여기부터 백엔드 코드
 
-//여기서의 socket은 연결된 브라우저를 말한다.
-const handleConnection = (socket) =>{
-    // 메세지 obj를 front에 보낸다 message.data 에 저장됨
-    socket.send("hello");
-}
+wsServer.on("connection", socket =>{
+    socket["nickname"] = "anonymous"
+    // front -> back
 
-//fake DB. 서버가 연결되면 그 커넥션을 담는다. 서로 다른 브라우저에 동일 메세지 보내기위함
-const sockets = [];
-
-//서버가 연결시
-wss.on("connection", (socket) => {
-    sockets.push(socket);
-    socket["nickname"] = "Anonymous";
-
-    console.log("connected to browser");
-    
-    //front에서 메세지 받을 때
-    socket.on("message", (msg) => {
-        //text를 json obj로 바꾼다
-        const message = JSON.parse(msg);
-        switch(message.type){
-            case "new_message":
-                sockets.forEach((aSocket) => 
-                    aSocket.send(`${socket.nickname}: ${message.payload}`)
-                    );
-                break;
-            case "nickname":
-                //socket obj 에 "nickname" : payload 추가
-                socket["nickname"] = message.payload;
-                break;
-        }
-
+    //프론트에서 받은 enter_room 이벤트를 받을 시. 보내진 args 인 msg 를 출력하고 프론트에 done함수를 실행한다.
+    socket.on("enter_room", (roomName, showRoom)=> {
+        console.log(roomName);
+        //room 으로 참가하기
+        socket.join(roomName);
+        showRoom(roomName);
+        //유저를 제외한 모든 사람에게 welcome 이벤트를 roomName 모두에게 보내기. 
+        socket.to(roomName).emit("welcome", socket.nickname);
     });
+
+    //연결 끊길시
+    socket.on("disconnecting", () => {
+        socket.rooms.forEach((room) => socket.to(room).emit("bye", socket.nickname));
+    })
+
+    //메세지 입력시
+    socket.on("new_message", (msg, room, whatYouSaid) => {
+        socket.to(room).emit("new_message", `${socket.nickname}: ${msg}`);
+        //메세지 출력
+        whatYouSaid();
+        
+    })
+    //닉네임 저장시
+    socket.on("nickname", (nickname) => {
+        socket["nickname"] = nickname 
+    })
 });
 
+
 server.listen(3000, handleListen);
+

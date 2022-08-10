@@ -1,55 +1,94 @@
 // frontend part
 
-// frontend 와 backed 를 연결하기. 여기 socket은 서버로의 연결을 의미
-const socket = new WebSocket(`ws://${window.location.host}`);
+//backend 를 이어주는 io 함수를 선언한다.
+const socket = io();
 
-const messageList  = document.querySelector('ul');
-const nickForm = document.querySelector('#nick');
-const messageForm = document.querySelector('#message');
+const welcome = document.getElementById("welcome");
+const form = welcome.querySelector('form');
+const room = document.querySelector('#room');
+const chatForm = document.getElementById("chatForm");
 
+room.hidden = true;
 
-//서버(socket)가 online이 된 경우
-socket.addEventListener("open", () =>{
-    console.log("connected to server ");
-});
+function handleMessageSubmit(event) {
+    event.preventDefault();
 
-//서버가 메세지를 받은 경우
-socket.addEventListener("message", (message)=>{
-   const li = document.createElement('li');
-   li.innerText = message.data;
-   messageList.append(li);
-});
+    const input = room.querySelector("#msg input");
+    const value = input.value;
+    socket.emit("new_message", value, roomName, () => {
+      addMessage(`You: ${value}`);
+    });
+    input.value = "";
+  }
 
-// 서버가 offline 이 될 경우
-socket.addEventListener("close", () =>{
-    console.log("disconnected from server");
-});
+function handleNicknameSubmit(event){
+    event.preventDefault();
 
-
-// json obj 를 텍스트형태로 리턴한다.
-function makeMessage( type, payload){
-    const msg = {type, payload};
-    return JSON.stringify(msg);
+    const input = room.querySelector("#name input");
+    const value = input.value;
+    socket.emit("nickname", value)
 }
 
-function handleSubmit(event){
+  function addMessage(message) {
+    const ul = room.querySelector("ul");
+    const li = document.createElement("li");
+    li.innerText = message;
+    ul.appendChild(li);
+  }
+
+function showRoom(roomName) {
+    welcome.hidden = true;
+    room.hidden =false;
+    const h3 = room.querySelector('h3');
+    h3.innerText = `Room [${roomName}]`;
+    const msgForm = room.querySelector("#msg");
+    const nameForm = room.querySelector("#name");
+
+    // form 에 메세지 입력하는 이벤트 리스너를 추가한다
+    msgForm.addEventListener("submit", handleMessageSubmit);
+    nameForm.addEventListener("submit", handleNicknameSubmit);
+}
+
+
+function handleRoomSubmit(event) {
     event.preventDefault();
-    const input = messageForm.querySelector("input");
-    //backend 로 input.value보내기
-    socket.send(makeMessage("new_message", input.value));
+    const input = form.querySelector("input");
+    
+
+    //소켓io 에서는 sockeet.submit 대신 emit 을 쓴다. 
+    // socket.emit('이벤트텍스트', JSON obj, 콜백함수) 
+    //enter_room(임의) 이벤트를 백엔드에 전송. 스트링이 아닌 자바스크립트 오브젝트도 그대로 전송한다.  마지막 agm 로 콜백함수도 전달 가능(프론트에서 만든 함수를 서버에서 실행하게 해준다.)
+    socket.emit("enter_room", input.value, showRoom );
+
+    roomName = input.value;
     input.value= "";
-    
+
+
 }
-function handleNickSubmit(event){
+function handleChatMessage(event){
     event.preventDefault();
-    const input = nickForm.querySelector("input");
-    
-    //서버에 단순 메세지가 아니라 json obj을 보낸다
-    socket.send(
-        makeMessage("nickname", input.value)
-    );
-    input.value ="";
+    const input = chatForm.querySelector("input");
+
+    socket.emit("enterMessage", input.value, addMessage);
+
+    input.value= "";
 }
 
-nickForm.addEventListener("submit", handleNickSubmit);
-messageForm.addEventListener("submit", handleSubmit);
+
+//on: back -> front 
+socket.on("welcome", (name)=> {
+    console.log("welcome!")
+    addMessage(`${name} joined` );
+});
+
+socket.on("bye", (name)=>{
+    console.log("someone left!");
+    addMessage(`${name} left!` );
+})
+
+
+
+form.addEventListener("submit", handleRoomSubmit);
+
+//메세지 받아서 표시하기
+socket.on("new_message", addMessage);
