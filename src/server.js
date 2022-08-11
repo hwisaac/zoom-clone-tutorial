@@ -26,13 +26,40 @@ const server = http.createServer(app);
 // socketIO로 서버를 만들자.
 const wsServer = SocketIO(server);
 
-
 //여기부터 백엔드 코드
+
+function publicRooms(){
+    //wsServer 안에서 sids 와 rooms를 가져오기
+    const {
+        sockets: {
+            adapter:{
+                sids, rooms}
+            }
+        } = wsServer;
+    // 퍼블릭룸이 담길 리스트 만들기
+    const publicRooms = [];
+
+    rooms.forEach((_, key)=> {
+        if(sids.get(key) === undefined){
+            publicRooms.push(key);
+        }
+    });
+    return publicRooms;
+    
+}
+function countRoom(roomName){
+    return wsServer.sockets.adapter.rooms.get(roomName)?.size;
+}
 
 wsServer.on("connection", socket =>{
     socket["nickname"] = "anonymous"
     // front -> back
 
+    // 이벤트가 발생할때마다
+    socket.onAny((event) => {
+
+        console.log(`Socket Event 발생: ${event}`);
+    });
     //프론트에서 받은 enter_room 이벤트를 받을 시. 보내진 args 인 msg 를 출력하고 프론트에 done함수를 실행한다.
     socket.on("enter_room", (roomName, showRoom)=> {
         console.log(roomName);
@@ -40,14 +67,20 @@ wsServer.on("connection", socket =>{
         socket.join(roomName);
         showRoom(roomName);
         //유저를 제외한 모든 사람에게 welcome 이벤트를 roomName 모두에게 보내기. 
-        socket.to(roomName).emit("welcome", socket.nickname);
+        socket.to(roomName).emit("welcome", socket.nickname, countRoom(roomName));
+        
+        //모든 소켓에 보낼때는 sokets.emit("이벤트", args..);
+        wsServer.sockets.emit("room_change", publicRooms());
     });
 
-    //연결 끊길시
+    //연결끊길시. disconnecting event 는 소켓이 방을 떠나기 직전 발생한다.
     socket.on("disconnecting", () => {
-        socket.rooms.forEach((room) => socket.to(room).emit("bye", socket.nickname));
+        socket.rooms.forEach((room) => socket.to(room).emit("bye", socket.nickname, countRoom(room)-1));
     })
-
+    //disconnect event 는 떠난 후에 이벤트를 다룰수 있다.
+    socket.on("disconnect", ()=>{
+        wsServer.sockets.emit("room_change", publicRooms());
+    })
     //메세지 입력시
     socket.on("new_message", (msg, room, whatYouSaid) => {
         socket.to(room).emit("new_message", `${socket.nickname}: ${msg}`);
@@ -59,6 +92,9 @@ wsServer.on("connection", socket =>{
     socket.on("nickname", (nickname) => {
         socket["nickname"] = nickname 
     })
+
+    //룸리스트 변경시
+    socket.on("changedRoomList", (arg)=> console.log("room list: ",arg));
 });
 
 

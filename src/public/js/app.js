@@ -76,13 +76,17 @@ function handleChatMessage(event){
 
 
 //on: back -> front 
-socket.on("welcome", (name)=> {
+socket.on("welcome", (name,newCount)=> {
     console.log("welcome!")
+    const h3 = room.querySelector('h3');
+    h3.innerText = `Room [${roomName} (users: ${newCount})]`;
     addMessage(`${name} joined` );
 });
 
-socket.on("bye", (name)=>{
+socket.on("bye", (name, newCount)=>{
     console.log("someone left!");
+    const h3 = room.querySelector('h3');
+    h3.innerText = `Room [${roomName} (users: ${newCount})]`;
     addMessage(`${name} left!` );
 })
 
@@ -92,3 +96,22 @@ form.addEventListener("submit", handleRoomSubmit);
 
 //메세지 받아서 표시하기
 socket.on("new_message", addMessage);
+socket.on("room_change", (rooms) => {
+  const roomList = document.querySelector("#openRooms");
+  const rList=[];
+  roomList.innerHTML = "";
+  rooms.forEach((room)=>{
+    
+    if(rooms.length === 0){
+      roomList.innerHTML = "";
+      socket.emit("changedRoomList", rList);
+      return;
+    }
+    const li = document.createElement("li");
+    li.innerText= room;
+    roomList.append(li);
+    rList.push(room);
+    socket.emit("changedRoomList", rList);
+  })
+}
+          );
