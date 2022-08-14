@@ -1,30 +1,24 @@
 const socket = io();
-
 const myFace = document.getElementById("myFace");
 const muteBtn = document.getElementById("mute");
 const cameraBtn = document.getElementById("camera");
-//카메라 선택 옵션
 const camerasSelect = document.getElementById("cameras");
 const call = document.getElementById("call");
 
 call.hidden = true;
 
-let myStream; // stream 은 video+audio 를 의미
+let myStream;
 let muted = false;
 let cameraOff = false;
 let roomName;
 
 async function getCameras() {
   try {
-    // 디바이스를 전부 가져오기
     const devices = await navigator.mediaDevices.enumerateDevices();
-    //videoinput 에 해당하는 디바이스로 필터링
     const cameras = devices.filter((device) => device.kind === "videoinput");
-
     const currentCamera = myStream.getVideoTracks()[0];
     cameras.forEach((camera) => {
       const option = document.createElement("option");
-      // id는 value에저장한다. stream에 이 장치를 사용하도록 할 거임
       option.value = camera.deviceId;
       option.innerText = camera.label;
       if (currentCamera.label === camera.label) {
@@ -36,11 +30,10 @@ async function getCameras() {
     console.log(e);
   }
 }
-
 async function getMedia(deviceId) {
   const initialConstrains = {
     audio: true,
-    video: { facingMode: "user" },//모바일시 셀카 카메라로 자동설정
+    video: { facingMode: "user" },
   };
   const cameraConstraints = {
     audio: true,
@@ -50,10 +43,7 @@ async function getMedia(deviceId) {
     myStream = await navigator.mediaDevices.getUserMedia(
       deviceId ? cameraConstraints : initialConstrains
     );
-    // 스트림을 #myFace 에 넣어준다
     myFace.srcObject = myStream;
-
-    //deviceID가 없을때만 카메라 목록을 가져오게 함
     if (!deviceId) {
       await getCameras();
     }
@@ -62,11 +52,10 @@ async function getMedia(deviceId) {
   }
 }
 
-
-function handleMuteClick() {\
+function handleMuteClick() {
   myStream
     .getAudioTracks()
-    .forEach((track) => (track.enabled = !track.enabled)); //track.enabled 토글키
+    .forEach((track) => (track.enabled = !track.enabled));
   if (!muted) {
     muteBtn.innerText = "Unmute";
     muted = true;
@@ -87,12 +76,9 @@ function handleCameraClick() {
     cameraOff = true;
   }
 }
-
 async function handleCameraChange() {
-  //getMedia 에 deviceID 전달
   await getMedia(camerasSelect.value);
 }
-
 muteBtn.addEventListener("click", handleMuteClick);
 cameraBtn.addEventListener("click", handleCameraClick);
 camerasSelect.addEventListener("input", handleCameraChange);
